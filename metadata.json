@@ -1,0 +1,5 @@
+{
+  "name": "ReStudy: Exam Question Organizer",
+  "description": "A modern, minimalist PWA to help learners collect, organize, and study tough exam questions. Features image-first workflows, a fullscreen study mode, and powerful filtering.",
+  "requestFramePermissions": []
+}
