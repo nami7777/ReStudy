@@ -18,7 +18,9 @@ type Action =
     | { type: 'MERGE_DATA'; payload: AppState }
     | { type: 'ADD_TAG'; payload: Tag }
     | { type: 'UPDATE_TAG'; payload: Tag }
-    | { type: 'DELETE_TAG'; payload: { tagId: string } };
+    | { type: 'DELETE_TAG'; payload: { tagId: string } }
+    | { type: 'ADD_TAG_TO_QUESTIONS'; payload: { questionIds: string[]; tagId: string } }
+    | { type: 'REMOVE_TAG_FROM_QUESTIONS'; payload: { questionIds: string[]; tagId: string } };
 
 // 2. Define Context Type (what consumers get)
 interface DataContextType {
@@ -39,6 +41,8 @@ interface DataContextType {
     addTag: (tagData: Omit<Tag, 'id'>) => void;
     updateTag: (tagId: string, tagData: Partial<Omit<Tag, 'id'>>) => void;
     deleteTag: (tagId: string) => void;
+    addTagToQuestions: (questionIds: string[], tagId: string) => void;
+    removeTagFromQuestions: (questionIds: string[], tagId: string) => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -140,6 +144,34 @@ const appReducer = (state: AppState, action: Action): AppState => {
                 }))
             };
         
+        case 'ADD_TAG_TO_QUESTIONS': {
+            const { questionIds, tagId } = action.payload;
+            const idSet = new Set(questionIds);
+            return {
+                ...state,
+                questions: state.questions.map(q => {
+                    if (idSet.has(q.id) && !q.tags.includes(tagId)) {
+                        return { ...q, tags: [...q.tags, tagId], updatedAt: new Date().toISOString() };
+                    }
+                    return q;
+                })
+            };
+        }
+
+        case 'REMOVE_TAG_FROM_QUESTIONS': {
+            const { questionIds, tagId } = action.payload;
+            const idSet = new Set(questionIds);
+            return {
+                ...state,
+                questions: state.questions.map(q => {
+                    if (idSet.has(q.id) && q.tags.includes(tagId)) {
+                        return { ...q, tags: q.tags.filter(id => id !== tagId), updatedAt: new Date().toISOString() };
+                    }
+                    return q;
+                })
+            };
+        }
+
         default:
             return state;
     }
@@ -337,6 +369,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         dispatch({ type: 'DELETE_TAG', payload: { tagId } });
     }, []);
 
+    const addTagToQuestions = useCallback((questionIds: string[], tagId: string) => {
+        dispatch({ type: 'ADD_TAG_TO_QUESTIONS', payload: { questionIds, tagId } });
+    }, []);
+
+    const removeTagFromQuestions = useCallback((questionIds: string[], tagId: string) => {
+        dispatch({ type: 'REMOVE_TAG_FROM_QUESTIONS', payload: { questionIds, tagId } });
+    }, []);
+
 
     const value = {
         exams: state.exams,
@@ -356,6 +396,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         addTag,
         updateTag,
         deleteTag,
+        addTagToQuestions,
+        removeTagFromQuestions,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>

@@ -7,7 +7,7 @@ import QuestionCard from '../components/QuestionCard';
 import AnswerModal from '../components/AnswerModal';
 import Spinner from '../components/Spinner';
 import Toast from '../components/Toast';
-import { DocumentAddIcon, TrashIcon, PencilIcon } from '../components/icons';
+import { DocumentAddIcon, TrashIcon, PencilIcon, TagIcon, PlusIcon, XIcon } from '../components/icons';
 import { TagManager } from '../components/TagManager';
 
 declare const jspdf: any;
@@ -22,7 +22,7 @@ interface ExamDetailScreenProps {
 }
 
 const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartIndex }: ExamDetailScreenProps) => {
-    const { exams, questions: allQuestions, tags: allTags, addQuestions, deleteQuestion, updateQuestion, deleteQuestions, updateQuestions } = useData();
+    const { exams, questions: allQuestions, tags: allTags, addQuestions, deleteQuestion, updateQuestion, deleteQuestions, updateQuestions, addTagToQuestions, removeTagFromQuestions } = useData();
     const exam = useMemo(() => exams.find(e => e.id === examId), [exams, examId]);
     const tags = useMemo(() => allTags.filter(t => t.examId === examId), [allTags, examId]);
     const questions = useMemo(() =>
@@ -37,7 +37,10 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
     const [processingFiles, setProcessingFiles] = useState(0);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const pdfInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [isImportingPdf, setIsImportingPdf] = useState(false);
+    const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
+    const tagPopoverRef = useRef<HTMLDivElement>(null);
 
     const [questionsToAnswerQueue, setQuestionsToAnswerQueue] = useState<Question[]>([]);
     const [currentQuestionForAnswer, setCurrentQuestionForAnswer] = useState<Question | null>(null);
@@ -48,6 +51,16 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
             setCurrentQuestionForAnswer(questionsToAnswerQueue[0]);
         }
     }, [questionsToAnswerQueue, currentQuestionForAnswer]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (tagPopoverRef.current && !tagPopoverRef.current.contains(event.target as Node)) {
+                setIsTagPopoverOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const closeAnswerModal = () => {
         if (!isEditingAnswer) {
@@ -301,6 +314,14 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
         [Difficulty.Hard]: questions.filter(q => q.difficulty === Difficulty.Hard).length,
         [Difficulty.NightBefore]: questions.filter(q => q.difficulty === Difficulty.NightBefore).length,
     };
+    
+    const tagCounts = useMemo(() => {
+        return tags.reduce((acc, tag) => {
+            acc[tag.id] = questions.filter(q => q.tags.includes(tag.id)).length;
+            return acc;
+        }, {} as Record<string, number>);
+    }, [questions, tags]);
+
 
     return (
         <div className="container mx-auto p-4 md:p-8">
@@ -332,7 +353,7 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
                     ))}
                      {tags.map(tag => (
                         <button key={tag.id} onClick={() => setFilter(tag.id)} className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors text-white`} style={{ backgroundColor: filter === tag.id ? tag.color : `${tag.color}B3` }}>
-                           {tag.name}
+                           {tag.name} <span className="text-xs opacity-70">{tagCounts[tag.id] ?? 0}</span>
                         </button>
                     ))}
                 </div>
@@ -348,16 +369,65 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
             </div>
 
             {selectedQuestions.length > 0 && (
-                 <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg mb-4 flex items-center justify-between animate-fadeIn">
+                <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg mb-4 flex items-center justify-between animate-fadeIn">
                     <span className="font-semibold">{selectedQuestions.length} selected</span>
                     <div className="flex items-center space-x-2">
                         <button onClick={() => handleBulkUpdateDifficulty(Difficulty.Normal)} className="px-3 py-1 text-sm bg-normal text-white rounded-full">Mark Normal</button>
                         <button onClick={() => handleBulkUpdateDifficulty(Difficulty.Hard)} className="px-3 py-1 text-sm bg-hard text-white rounded-full">Mark Hard</button>
                         <button onClick={() => handleBulkUpdateDifficulty(Difficulty.NightBefore)} className="px-3 py-1 text-sm bg-night-before text-white rounded-full">Mark Night-Before</button>
+                        
+                        <div className="relative" ref={tagPopoverRef}>
+                            <button 
+                                onClick={() => setIsTagPopoverOpen(prev => !prev)}
+                                className="px-3 py-1 text-sm bg-gray-500 hover:bg-gray-600 text-white rounded-full flex items-center gap-1 transition-colors"
+                                aria-haspopup="true"
+                                aria-expanded={isTagPopoverOpen}
+                            >
+                                <TagIcon className="w-4 h-4" />
+                                <span>Tags</span>
+                            </button>
+                            {isTagPopoverOpen && (
+                                <div className="absolute top-full mt-2 right-0 w-56 bg-white dark:bg-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-20 p-2 space-y-1">
+                                    {tags.length > 0 ? (
+                                        <>
+                                            <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 px-2 pt-1 pb-2 uppercase tracking-wider">Manage Tags</h4>
+                                            {tags.map(tag => (
+                                                <div key={tag.id} className="flex items-center justify-between p-1 group hover:bg-gray-100 dark:hover:bg-gray-600 rounded-md">
+                                                    <div className="text-sm font-medium flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                                                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }}></span>
+                                                        {tag.name}
+                                                    </div>
+                                                    <div className="flex items-center">
+                                                        <button 
+                                                            onClick={() => { addTagToQuestions(selectedQuestions, tag.id); }}
+                                                            className="p-1 text-gray-400 hover:text-green-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            title={`Add "${tag.name}"`}
+                                                        >
+                                                            <PlusIcon className="w-5 h-5" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => { removeTagFromQuestions(selectedQuestions, tag.id); }}
+                                                            className="p-1 text-gray-400 hover:text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            title={`Remove "${tag.name}"`}
+                                                        >
+                                                            <XIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <span className="text-xs text-gray-500 dark:text-gray-400 p-2 block text-center">No custom tags for this exam.</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        
                         <button onClick={handleBulkDelete} className="p-2 text-gray-500 hover:text-red-500 rounded-full"><TrashIcon className="w-5 h-5"/></button>
                     </div>
                 </div>
             )}
+
 
             <div onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center mb-8 transition-colors">
                 {processingFiles > 0 || isImportingPdf ? (
@@ -367,7 +437,13 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center">
-                        <p className="text-gray-500 dark:text-gray-400">Drag & drop images, or paste with Ctrl/Cmd+V</p>
+                        <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && handleFiles(e.target.files)} multiple accept="image/*" className="hidden" />
+                        <p className="text-gray-500 dark:text-gray-400">
+                            Drag & drop images, paste, or{' '}
+                            <button type="button" onClick={() => fileInputRef.current?.click()} className="font-semibold text-indigo-500 hover:text-indigo-400 focus:outline-none focus:underline">
+                                browse your files
+                            </button>
+                        </p>
                         <div className="flex items-center my-4">
                             <hr className="w-24 border-gray-300 dark:border-gray-600" />
                             <span className="mx-4 text-gray-400 text-sm">OR</span>
