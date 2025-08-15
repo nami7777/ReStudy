@@ -27,7 +27,7 @@ const ImportDataModal = ({ onClose, onMerge, onOverwrite, importedData }: Import
                         className="w-full text-left p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
                     >
                         <h3 className="font-semibold text-gray-800 dark:text-gray-200">Merge with existing data</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Adds new items and updates existing ones based on their ID. Does not delete anything.</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Adds new items and updates existing ones. Does not delete anything.</p>
                     </button>
                     <button
                         onClick={() => onOverwrite(importedData)}
@@ -44,6 +44,7 @@ const ImportDataModal = ({ onClose, onMerge, onOverwrite, importedData }: Import
         </div>
     );
 };
+
 
 interface HomeScreenProps {
     setView: (view: View) => void;
@@ -174,9 +175,11 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
     };
 
     const handleOverwrite = async (data: AppState) => {
-        await replaceData(data);
-        setImportedData(null);
-        alert('Data overwritten successfully!');
+        if(window.confirm('Are you sure you want to overwrite all existing data? This cannot be undone.')) {
+            await replaceData(data);
+            setImportedData(null);
+            alert('Data overwritten successfully!');
+        }
     };
 
 
