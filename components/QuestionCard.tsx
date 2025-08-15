@@ -1,17 +1,19 @@
 
+
 import React from 'react';
 import { Question, Difficulty } from '../types';
-import { TrashIcon } from './icons';
+import { TrashIcon, PencilIcon } from './icons';
 
 interface QuestionCardProps {
     question: Question;
     onUpdate: (id: string, data: Partial<Omit<Question, 'id' | 'createdAt' | 'updatedAt'>>) => void;
     onDelete?: (id: string) => void;
     onSelect: (id: string) => void;
+    onEditAnswer: (id: string) => void;
     isSelected: boolean;
 }
 
-const QuestionCard = ({ question, onUpdate, onDelete, onSelect, isSelected }: QuestionCardProps) => {
+const QuestionCard = ({ question, onUpdate, onDelete, onSelect, onEditAnswer, isSelected }: QuestionCardProps) => {
     const difficultyColor = {
         [Difficulty.Normal]: 'border-normal',
         [Difficulty.Hard]: 'border-hard',
@@ -29,20 +31,29 @@ const QuestionCard = ({ question, onUpdate, onDelete, onSelect, isSelected }: Qu
                         <button onClick={e => { e.stopPropagation(); onUpdate(question.id, { difficulty: Difficulty.Hard })}} className={`w-6 h-6 rounded-full bg-hard ${question.difficulty === Difficulty.Hard && 'ring-2 ring-offset-2 dark:ring-offset-gray-800 ring-hard'}`} aria-label="Mark as Hard"></button>
                         <button onClick={e => { e.stopPropagation(); onUpdate(question.id, { difficulty: Difficulty.NightBefore })}} className={`w-6 h-6 rounded-full bg-night-before ${question.difficulty === Difficulty.NightBefore && 'ring-2 ring-offset-2 dark:ring-offset-gray-800 ring-night-before'}`} aria-label="Mark as Night Before"></button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            if (window.confirm('Are you sure you want to delete this question?')) {
-                                onDelete?.(question.id);
-                            }
-                        }}
-                        aria-label="Delete question"
-                        className="text-gray-400 hover:text-red-500"
-                    >
-                        <TrashIcon className="w-4 h-4"/>
-                    </button>
+                    <div className="flex items-center space-x-1">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onEditAnswer(question.id); }}
+                            aria-label="Edit answer"
+                            className="text-gray-400 hover:text-indigo-500 p-1 rounded-full"
+                        >
+                            <PencilIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                if (window.confirm('Are you sure you want to delete this question?')) {
+                                    onDelete?.(question.id);
+                                }
+                            }}
+                            aria-label="Delete question"
+                            className="text-gray-400 hover:text-red-500 p-1 rounded-full"
+                        >
+                            <TrashIcon className="w-4 h-4"/>
+                        </button>
+                    </div>
                  </div>
             </div>
         </div>

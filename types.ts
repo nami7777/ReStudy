@@ -42,4 +42,9 @@ export interface Exam {
   updatedAt: string;
 }
 
+export interface AppState {
+    exams: Exam[];
+    questions: Question[];
+}
+
 export type View = 'home' | 'exam-detail' | 'study-mode';

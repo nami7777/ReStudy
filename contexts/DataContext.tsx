@@ -1,12 +1,9 @@
 
+
 import React, { createContext, useContext, ReactNode, useReducer, useEffect, useCallback } from 'react';
-import { Exam, Question } from '../types';
+import { Exam, Question, AppState } from '../types';
 
 // 1. Define State and Actions
-interface AppState {
-    exams: Exam[];
-    questions: Question[];
-}
 
 type Action =
     | { type: 'ADD_EXAM'; payload: Exam }
@@ -16,7 +13,9 @@ type Action =
     | { type: 'UPDATE_QUESTION'; payload: { questionId: string; data: Partial<Omit<Question, 'id' | 'createdAt' | 'updatedAt'>> } }
     | { type: 'DELETE_QUESTION'; payload: { questionId: string } }
     | { type: 'DELETE_QUESTIONS'; payload: { questionIds: string[] } }
-    | { type: 'UPDATE_QUESTIONS'; payload: { questionIds: string[]; data: Partial<Omit<Question, 'id' | 'createdAt' | 'updatedAt'>> } };
+    | { type: 'UPDATE_QUESTIONS'; payload: { questionIds: string[]; data: Partial<Omit<Question, 'id' | 'createdAt' | 'updatedAt'>> } }
+    | { type: 'REPLACE_DATA'; payload: AppState }
+    | { type: 'MERGE_DATA'; payload: AppState };
 
 // 2. Define Context Type (what consumers get)
 interface DataContextType {
@@ -30,6 +29,8 @@ interface DataContextType {
     deleteQuestion: (questionId: string) => void;
     deleteQuestions: (questionIds: string[]) => void;
     updateQuestions: (questionIds: string[], questionData: Partial<Omit<Question, 'id' | 'createdAt' | 'updatedAt'>>) => void;
+    replaceData: (data: AppState) => void;
+    mergeData: (data: AppState) => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -84,6 +85,23 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return {
                 ...state,
                 questions: state.questions.map(q => idSetUpdate.has(q.id) ? { ...q, ...action.payload.data, updatedAt: new Date().toISOString() } : q)
+            };
+        }
+
+        case 'REPLACE_DATA':
+            return action.payload;
+        
+        case 'MERGE_DATA': {
+            const existingExamIds = new Set(state.exams.map(e => e.id));
+            const existingQuestionIds = new Set(state.questions.map(q => q.id));
+
+            const newExams = action.payload.exams.filter(exam => !existingExamIds.has(exam.id));
+            const newQuestions = action.payload.questions.filter(q => !existingQuestionIds.has(q.id));
+
+            return {
+                ...state,
+                exams: [...state.exams, ...newExams],
+                questions: [...state.questions, ...newQuestions],
             };
         }
         
@@ -167,6 +185,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         dispatch({ type: 'UPDATE_QUESTIONS', payload: { questionIds, data } });
     }, []);
 
+    const replaceData = useCallback((data: AppState) => {
+        dispatch({ type: 'REPLACE_DATA', payload: data });
+    }, []);
+
+    const mergeData = useCallback((data: AppState) => {
+        dispatch({ type: 'MERGE_DATA', payload: data });
+    }, []);
+
     const value = {
         exams: state.exams,
         questions: state.questions,
@@ -178,6 +204,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         deleteQuestion,
         deleteQuestions,
         updateQuestions,
+        replaceData,
+        mergeData,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>

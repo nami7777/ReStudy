@@ -8,7 +8,7 @@ import QuestionCard from '../components/QuestionCard';
 import AnswerModal from '../components/AnswerModal';
 import Spinner from '../components/Spinner';
 import Toast from '../components/Toast';
-import { DocumentAddIcon, TrashIcon } from '../components/icons';
+import { DocumentAddIcon, TrashIcon, PencilIcon } from '../components/icons';
 
 declare const jspdf: any;
 declare const JSZip: any;
@@ -38,6 +38,7 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions }: ExamDetailScre
 
     const [questionsToAnswerQueue, setQuestionsToAnswerQueue] = useState<Question[]>([]);
     const [currentQuestionForAnswer, setCurrentQuestionForAnswer] = useState<Question | null>(null);
+    const [isEditingAnswer, setIsEditingAnswer] = useState(false);
 
     useEffect(() => {
         if (questionsToAnswerQueue.length > 0 && !currentQuestionForAnswer) {
@@ -46,8 +47,19 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions }: ExamDetailScre
     }, [questionsToAnswerQueue, currentQuestionForAnswer]);
 
     const closeAnswerModal = () => {
+        if (!isEditingAnswer) {
+            setQuestionsToAnswerQueue(prev => prev.slice(1));
+        }
         setCurrentQuestionForAnswer(null);
-        setQuestionsToAnswerQueue(prev => prev.slice(1));
+        setIsEditingAnswer(false);
+    };
+
+    const handleEditAnswer = (questionId: string) => {
+        const questionToEdit = questions.find(q => q.id === questionId);
+        if (questionToEdit) {
+            setIsEditingAnswer(true);
+            setCurrentQuestionForAnswer(questionToEdit);
+        }
     };
 
     const filteredQuestions = useMemo(() => {
@@ -357,6 +369,7 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions }: ExamDetailScre
                         }}
                         onSelect={handleSelectQuestion}
                         isSelected={selectedQuestions.includes(q.id)}
+                        onEditAnswer={handleEditAnswer}
                     />
                 ))}
             </div>
