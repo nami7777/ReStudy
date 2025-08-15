@@ -1,31 +1,41 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Question, Difficulty, View } from '../types';
 import { XIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/icons';
 import AnswerDisplayModal from '../components/AnswerDisplayModal';
+import { useStoredImage } from '../hooks/useStoredImage';
+import Spinner from '../components/Spinner';
 
 interface StudyModeScreenProps {
     initialQuestions: Question[];
     setView: (view: View) => void;
     updateQuestion: (id: string, data: Partial<Omit<Question, 'id' | 'createdAt' | 'updatedAt'>>) => void;
+    examId: string;
+    startIndex?: number;
 }
 
-const StudyModeScreen = ({ initialQuestions, setView, updateQuestion }: StudyModeScreenProps) => {
+const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, startIndex = 0 }: StudyModeScreenProps) => {
     const [questions, setQuestions] = useState(initialQuestions);
-    const [currentIndex, setCurrentIndex] = useState(0);
+    const [currentIndex, setCurrentIndex] = useState(startIndex);
     const [animationClass, setAnimationClass] = useState('animate-fadeIn');
     const [isFinished, setIsFinished] = useState(false);
     const [isAnswerVisible, setIsAnswerVisible] = useState(false);
     const swipeRef = useRef({ startX: 0, isSwiping: false });
 
+    const progressKey = `restudy-progress-${examId}`;
     const currentQuestion = questions[currentIndex];
     const hasAnswer = !!currentQuestion?.answer && (!!currentQuestion.answer.text || (currentQuestion.answer.imageUrls && currentQuestion.answer.imageUrls.length > 0));
+
+    useEffect(() => {
+        // Persist progress
+        localStorage.setItem(progressKey, currentIndex.toString());
+    }, [currentIndex, progressKey]);
 
     const navigate = useCallback((direction: 'next' | 'prev') => {
         if (isAnswerVisible) setIsAnswerVisible(false);
 
         if (direction === 'next' && currentIndex === questions.length - 1) {
             setIsFinished(true);
+            localStorage.removeItem(progressKey); // Clear progress on finish
             return;
         }
 
@@ -40,7 +50,7 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion }: StudyMod
             });
             setAnimationClass(direction === 'next' ? 'animate-slideInRight' : 'animate-slideInLeft');
         }, 300);
-    }, [questions.length, currentIndex, isAnswerVisible]);
+    }, [questions.length, currentIndex, isAnswerVisible, progressKey]);
     
     const handleTriage = (difficulty: Difficulty) => {
         if (!currentQuestion) return;
@@ -104,11 +114,24 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion }: StudyMod
     };
 
     const handleRestart = () => {
+        localStorage.removeItem(progressKey);
         setQuestions(initialQuestions);
         setCurrentIndex(0);
         setIsFinished(false);
         setAnimationClass('animate-fadeIn');
     };
+
+    const QuestionImage = ({ imageUrl }: { imageUrl: string }) => {
+        const { src, isLoading } = useStoredImage(imageUrl);
+        if (isLoading) {
+            return (
+                <div className="w-full max-w-4xl max-h-[70vh] flex justify-center items-center">
+                    <Spinner />
+                </div>
+            );
+        }
+        return <img src={src} alt="Question" className="max-w-full max-h-full object-contain rounded-lg"/>
+    }
 
 
     if (isFinished) {
@@ -152,7 +175,7 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion }: StudyMod
 
             <div className={`w-full max-w-4xl max-h-[70vh] flex justify-center items-center my-4 ${animationClass}`}>
                 {currentQuestion.imageUrl ? (
-                    <img src={currentQuestion.imageUrl} alt="Question" className="max-w-full max-h-full object-contain rounded-lg"/>
+                    <QuestionImage imageUrl={currentQuestion.imageUrl} />
                 ) : (
                     <p className="text-2xl p-8 bg-gray-800 rounded-lg">{currentQuestion.text}</p>
                 )}

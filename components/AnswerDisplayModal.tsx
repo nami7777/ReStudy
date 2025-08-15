@@ -1,12 +1,22 @@
-
 import React from 'react';
 import { Answer } from '../types';
 import { XIcon } from './icons';
+import { useStoredImage } from '../hooks/useStoredImage';
 
 interface AnswerDisplayModalProps {
     answer: Answer;
     onClose: () => void;
 }
+
+const AnswerImage = ({ imageUrl }: { imageUrl: string }) => {
+    const { src, isLoading } = useStoredImage(imageUrl);
+
+    return (
+        <div className="w-full bg-gray-900 rounded-lg flex items-center justify-center">
+            {isLoading ? <span>Loading...</span> : <img src={src} alt={`Answer image`} className="rounded-lg object-contain w-full" />}
+        </div>
+    );
+};
 
 const AnswerDisplayModal = ({ answer, onClose }: AnswerDisplayModalProps) => {
     return (
@@ -23,7 +33,7 @@ const AnswerDisplayModal = ({ answer, onClose }: AnswerDisplayModalProps) => {
                     {answer.imageUrls && answer.imageUrls.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {answer.imageUrls.map((url, index) => (
-                                <img key={index} src={url} alt={`Answer image ${index + 1}`} className="rounded-lg object-contain w-full" />
+                                <AnswerImage key={url} imageUrl={url} />
                             ))}
                         </div>
                     )}

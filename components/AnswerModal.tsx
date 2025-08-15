@@ -1,9 +1,10 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Question, Answer } from '../types';
 import { fileToBase64 } from '../utils/helpers';
 import Modal from './Modal';
 import { XIcon } from './icons';
+import { storeImage } from '../services/imageStore';
+import { useStoredImage } from '../hooks/useStoredImage';
 
 interface AnswerModalProps {
     question: Question;
@@ -11,13 +12,22 @@ interface AnswerModalProps {
     onSave: (answer: Answer) => void;
 }
 
+const ImagePreview = ({ imageKey }: { imageKey: string }) => {
+    const { src, isLoading } = useStoredImage(imageKey);
+    return (
+        <div className="w-full h-24 bg-gray-200 dark:bg-gray-700 rounded-md flex items-center justify-center">
+            {isLoading ? <span>...</span> : <img src={src} alt="Answer image" className="w-full h-full object-cover rounded-md"/>}
+        </div>
+    );
+}
+
 const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
     const [answerText, setAnswerText] = useState(question.answer?.text || '');
-    const [answerImages, setAnswerImages] = useState<string[]>(question.answer?.imageUrls || []);
+    const [answerImageKeys, setAnswerImageKeys] = useState<string[]>(question.answer?.imageUrls || []);
 
     const handleSave = () => {
-        if (answerText.trim() || answerImages.length > 0) {
-            onSave({ text: answerText, imageUrls: answerImages });
+        if (answerText.trim() || answerImageKeys.length > 0) {
+            onSave({ text: answerText, imageUrls: answerImageKeys });
         } else {
             onClose(); // Just close if nothing was entered
         }
@@ -27,7 +37,8 @@ const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
         for (const file of Array.from(files)) {
             if (file.type.startsWith('image/')) {
                 const base64 = await fileToBase64(file);
-                setAnswerImages(prev => [...prev, base64]);
+                const key = await storeImage(base64);
+                setAnswerImageKeys(prev => [...prev, key]);
             }
         }
     }, []);
@@ -36,12 +47,15 @@ const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
         const items = event.clipboardData?.items;
         if (!items) return;
         const files = Array.from(items).filter(item => item.kind === 'file').map(item => item.getAsFile() as File);
-        if (files.length > 0) handleFiles(files);
+        if (files.length > 0) {
+            event.preventDefault();
+            handleFiles(files);
+        }
     }, [handleFiles]);
     
     useEffect(() => {
-        window.addEventListener('paste', handlePaste);
-        return () => window.removeEventListener('paste', handlePaste);
+        document.addEventListener('paste', handlePaste);
+        return () => document.removeEventListener('paste', handlePaste);
     }, [handlePaste]);
 
 
@@ -62,7 +76,9 @@ const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
     };
     
     const removeImage = (indexToRemove: number) => {
-        setAnswerImages(prev => prev.filter((_, index) => index !== indexToRemove));
+        // Note: This doesn't delete from IndexedDB yet, as the user might not save.
+        // A cleanup process for orphaned images could be implemented later if needed.
+        setAnswerImageKeys(prev => prev.filter((_, index) => index !== indexToRemove));
     };
 
     return (
@@ -92,11 +108,11 @@ const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
                     </div>
                 </div>
 
-                {answerImages.length > 0 && (
+                {answerImageKeys.length > 0 && (
                     <div className="grid grid-cols-3 gap-2">
-                        {answerImages.map((src, index) => (
-                            <div key={index} className="relative group">
-                                <img src={src} alt={`Answer image ${index+1}`} className="w-full h-24 object-cover rounded-md"/>
+                        {answerImageKeys.map((key, index) => (
+                            <div key={key} className="relative group">
+                                <ImagePreview imageKey={key} />
                                 <button onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <XIcon className="w-4 h-4" />
                                 </button>

@@ -10,6 +10,7 @@ function AppContent() {
     const [view, setView] = useState<View>('home');
     const [currentExamId, setCurrentExamId] = useState<string | null>(null);
     const [studyQuestions, setStudyQuestions] = useState<Question[]>([]);
+    const [studyStartIndex, setStudyStartIndex] = useState(0);
     
     const [isDarkMode, setIsDarkMode] = useState(() => 
         window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -28,7 +29,7 @@ function AppContent() {
     const renderContent = () => {
         switch (view) {
             case 'exam-detail':
-                if (currentExamId) return <ExamDetailScreen examId={currentExamId} setView={setView} setStudyQuestions={setStudyQuestions}/>;
+                if (currentExamId) return <ExamDetailScreen examId={currentExamId} setView={setView} setStudyQuestions={setStudyQuestions} setStudyStartIndex={setStudyStartIndex} />;
                 setView('home'); // fallback
                 return null;
             case 'home':
@@ -40,7 +41,7 @@ function AppContent() {
     // Using a separate component to access the context hook
     const DataUpdaterForStudyMode = () => {
         const { updateQuestion } = useData();
-        return view === 'study-mode' ? <StudyModeScreen initialQuestions={studyQuestions} setView={setView} updateQuestion={updateQuestion}/> : null;
+        return view === 'study-mode' ? <StudyModeScreen initialQuestions={studyQuestions} setView={setView} updateQuestion={updateQuestion} examId={currentExamId!} startIndex={studyStartIndex} /> : null;
     }
 
     return (
