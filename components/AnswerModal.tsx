@@ -21,6 +21,23 @@ const ImagePreview = ({ imageKey }: { imageKey: string }) => {
     );
 }
 
+const QuestionContextImage = ({ imageUrl }: { imageUrl: string }) => {
+    const { src, isLoading } = useStoredImage(imageUrl);
+
+    if (isLoading) {
+        return (
+            <div className="max-h-32 w-full object-contain rounded-md bg-gray-100 dark:bg-gray-700 mb-4 flex items-center justify-center">
+                <p className="text-gray-500 dark:text-gray-400">Loading image...</p>
+            </div>
+        );
+    }
+    
+    if (!src) return null;
+
+    return <img src={src} alt="Question context" className="max-h-32 w-full object-contain rounded-md bg-gray-100 dark:bg-gray-700 mb-4"/>;
+}
+
+
 const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
     const [answerText, setAnswerText] = useState(question.answer?.text || '');
     const [answerImageKeys, setAnswerImageKeys] = useState<string[]>(question.answer?.imageUrls || []);
@@ -84,7 +101,7 @@ const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
     return (
         <Modal isOpen={true} onClose={onClose} title="Add Answer">
             <div className="space-y-4">
-                {question.imageUrl && <img src={question.imageUrl} alt="Question context" className="max-h-32 w-full object-contain rounded-md bg-gray-100 dark:bg-gray-700 mb-4"/>}
+                {question.imageUrl && <QuestionContextImage imageUrl={question.imageUrl} />}
                 
                 <div>
                     <label htmlFor="answerText" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Answer Text (Optional)</label>

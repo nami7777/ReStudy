@@ -4,8 +4,9 @@ import { useData } from '../contexts/DataContext';
 import { Tag } from '../types';
 import { PlusIcon, TrashIcon, PencilIcon, XIcon } from './icons';
 
-export const TagManager = () => {
-    const { tags, addTag, updateTag, deleteTag } = useData();
+export const TagManager = ({ examId }: { examId: string }) => {
+    const { tags: allTags, addTag, updateTag, deleteTag } = useData();
+    const tags = allTags.filter(t => t.examId === examId);
     const [name, setName] = useState('');
     const [color, setColor] = useState('#6366f1');
     const [editingTag, setEditingTag] = useState<Tag | null>(null);
@@ -18,7 +19,7 @@ export const TagManager = () => {
             updateTag(editingTag.id, { name, color });
             setEditingTag(null);
         } else {
-            addTag({ name, color });
+            addTag({ name, color, examId });
         }
         setName('');
         setColor('#6366f1');
@@ -75,7 +76,7 @@ export const TagManager = () => {
                     <button type="button" onClick={handleCancelEdit} className="p-2.5 bg-gray-200 dark:bg-gray-600 rounded-lg"><XIcon className="w-5 h-5"/></button>
                 )}
             </form>
-            {!canAddTag && !editingTag && <p className="text-sm text-yellow-600 dark:text-yellow-400 text-center">You can create up to 3 custom tags.</p>}
+            {!canAddTag && !editingTag && <p className="text-sm text-yellow-600 dark:text-yellow-400 text-center">You can create up to 3 custom tags per exam.</p>}
 
             <div className="flex flex-wrap gap-2">
                 {tags.map(tag => (

@@ -7,7 +7,43 @@ import Modal from '../components/Modal';
 import ExamForm from '../components/ExamForm';
 import { PlusIcon, TrashIcon, PencilIcon, DownloadIcon, UploadIcon } from '../components/icons';
 import { getImage } from '../services/imageStore';
-import { TagManager } from '../components/TagManager';
+
+interface ImportDataModalProps {
+    onClose: () => void;
+    onMerge: (data: AppState) => void;
+    onOverwrite: (data: AppState) => void;
+    importedData: AppState;
+}
+
+const ImportDataModal = ({ onClose, onMerge, onOverwrite, importedData }: ImportDataModalProps) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center backdrop-blur-sm" onClick={onClose} role="dialog" aria-modal="true">
+            <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 m-4 w-full max-w-md transform transition-all animate-slideInUp`} onClick={e => e.stopPropagation()}>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Import Options</h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">You are importing a backup file. How would you like to proceed?</p>
+                <div className="space-y-4">
+                    <button
+                        onClick={() => onMerge(importedData)}
+                        className="w-full text-left p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+                    >
+                        <h3 className="font-semibold text-gray-800 dark:text-gray-200">Merge with existing data</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Adds new items and updates existing ones based on their ID. Does not delete anything.</p>
+                    </button>
+                    <button
+                        onClick={() => onOverwrite(importedData)}
+                        className="w-full text-left p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+                    >
+                        <h3 className="font-semibold text-gray-800 dark:text-gray-200">Overwrite existing data</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Warning: Deletes all current data before importing. This cannot be undone.</p>
+                    </button>
+                </div>
+                <div className="flex justify-end mt-6">
+                     <button type="button" onClick={onClose} className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">Cancel</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface HomeScreenProps {
     setView: (view: View) => void;
@@ -17,9 +53,10 @@ interface HomeScreenProps {
 const isImageKey = (url?: string): url is string => !!url && url.startsWith('idb://');
 
 const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
-    const { exams, questions: allQuestions, tags, addExam, updateExam, deleteExam, replaceData } = useData();
+    const { exams, questions: allQuestions, tags, addExam, updateExam, deleteExam, replaceData, mergeData } = useData();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
+    const [importedData, setImportedData] = useState<AppState | null>(null);
     const importInputRef = useRef<HTMLInputElement>(null);
 
     const handleFormSubmit = (examData: Omit<Exam, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -68,7 +105,7 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
         );
         
         const dataToExport = {
-            version: '1.2.0', // Updated version for tags
+            version: '1.3.0', // Updated version for scoped tags
             createdAt: new Date().toISOString(),
             data: {
                 exams,
@@ -102,18 +139,22 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
             try {
                 const text = e.target?.result;
                 if (typeof text !== 'string') throw new Error('File could not be read.');
-                const parsedData = JSON.parse(text);
+                const parsedJson = JSON.parse(text);
+                const appState: AppState = parsedJson.data;
+
 
                 // Validation
-                const importedData: AppState = parsedData.data;
-                if (!importedData || !Array.isArray(importedData.exams) || !Array.isArray(importedData.questions)) {
+                if (!appState || !Array.isArray(appState.exams) || !Array.isArray(appState.questions)) {
                     throw new Error('Invalid backup file format.');
                 }
+                
+                const validatedAppState: AppState = {
+                    exams: appState.exams,
+                    questions: appState.questions,
+                    tags: appState.tags || [],
+                };
+                setImportedData(validatedAppState);
 
-                if (window.confirm('Are you sure you want to import this data? This will overwrite all your current exams and questions.')) {
-                    await replaceData({ exams: importedData.exams, questions: importedData.questions, tags: importedData.tags || [] });
-                    alert('Data imported successfully!');
-                }
             } catch (error) {
                 console.error('Import failed:', error);
                 alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -124,6 +165,18 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
             }
         };
         reader.readAsText(file);
+    };
+
+    const handleMerge = async (data: AppState) => {
+        await mergeData(data);
+        setImportedData(null);
+        alert('Data merged successfully!');
+    };
+
+    const handleOverwrite = async (data: AppState) => {
+        await replaceData(data);
+        setImportedData(null);
+        alert('Data overwritten successfully!');
     };
 
 
@@ -194,10 +247,6 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
             {exams.length > 0 && (
                 <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700 space-y-8">
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Custom Tags</h3>
-                        <TagManager />
-                    </div>
-                    <div>
                         <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Manage Data</h3>
                         <div className="flex items-center gap-4">
                             <button onClick={handleExport} className="flex items-center gap-2 bg-white dark:bg-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600">
@@ -215,6 +264,15 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
             <Modal isOpen={isModalOpen} onClose={closeModal} title={editingExam ? "Edit Exam" : "Create New Exam"}>
                 <ExamForm exam={editingExam} onSubmit={handleFormSubmit} onCancel={closeModal} />
             </Modal>
+
+            {importedData && (
+                <ImportDataModal
+                    importedData={importedData}
+                    onClose={() => setImportedData(null)}
+                    onMerge={handleMerge}
+                    onOverwrite={handleOverwrite}
+                />
+            )}
         </div>
     );
 };

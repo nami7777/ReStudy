@@ -8,6 +8,7 @@ import AnswerModal from '../components/AnswerModal';
 import Spinner from '../components/Spinner';
 import Toast from '../components/Toast';
 import { DocumentAddIcon, TrashIcon, PencilIcon } from '../components/icons';
+import { TagManager } from '../components/TagManager';
 
 declare const jspdf: any;
 declare const JSZip: any;
@@ -21,8 +22,9 @@ interface ExamDetailScreenProps {
 }
 
 const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartIndex }: ExamDetailScreenProps) => {
-    const { exams, questions: allQuestions, tags, addQuestions, deleteQuestion, updateQuestion, deleteQuestions, updateQuestions } = useData();
+    const { exams, questions: allQuestions, tags: allTags, addQuestions, deleteQuestion, updateQuestion, deleteQuestions, updateQuestions } = useData();
     const exam = useMemo(() => exams.find(e => e.id === examId), [exams, examId]);
+    const tags = useMemo(() => allTags.filter(t => t.examId === examId), [allTags, examId]);
     const questions = useMemo(() =>
         allQuestions
             .filter(q => q.examId === examId)
@@ -153,7 +155,7 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
                             type: 'image',
                             imageUrl,
                             text: pageText.trim() || `Page ${i} from PDF`,
-                            tags: ['pdf-import'],
+                            tags: [], // PDF import tag logic needs to be exam-specific
                             difficulty: Difficulty.Normal,
                             status: Status.New,
                         };
@@ -402,6 +404,11 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
                         onEditAnswer={handleEditAnswer}
                     />
                 ))}
+            </div>
+            
+            <div className="my-12 pt-8 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">Custom Tags for {exam.name}</h3>
+                <TagManager examId={examId} />
             </div>
 
             {toastMessage && <Toast message={toastMessage} />}

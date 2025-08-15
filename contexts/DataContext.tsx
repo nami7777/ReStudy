@@ -15,6 +15,7 @@ type Action =
     | { type: 'DELETE_QUESTIONS'; payload: { questionIds: string[] } }
     | { type: 'UPDATE_QUESTIONS'; payload: { questionIds: string[]; data: Partial<Omit<Question, 'id' | 'createdAt' | 'updatedAt'>> } }
     | { type: 'REPLACE_DATA'; payload: AppState }
+    | { type: 'MERGE_DATA'; payload: AppState }
     | { type: 'ADD_TAG'; payload: Tag }
     | { type: 'UPDATE_TAG'; payload: Tag }
     | { type: 'DELETE_TAG'; payload: { tagId: string } };
@@ -34,6 +35,7 @@ interface DataContextType {
     deleteQuestions: (questionIds: string[]) => Promise<void>;
     updateQuestions: (questionIds: string[], questionData: Partial<Omit<Question, 'id' | 'createdAt' | 'updatedAt'>>) => void;
     replaceData: (data: AppState) => Promise<void>;
+    mergeData: (data: AppState) => Promise<void>;
     addTag: (tagData: Omit<Tag, 'id'>) => void;
     updateTag: (tagId: string, tagData: Partial<Omit<Tag, 'id'>>) => void;
     deleteTag: (tagId: string) => void;
@@ -62,12 +64,15 @@ const appReducer = (state: AppState, action: Action): AppState => {
                 exams: state.exams.map(e => e.id === action.payload.examId ? { ...e, ...action.payload.data, updatedAt: new Date().toISOString() } : e)
             };
         
-        case 'DELETE_EXAM':
+        case 'DELETE_EXAM': {
+            const examId = action.payload.examId;
             return {
                 ...state,
-                exams: state.exams.filter(e => e.id !== action.payload.examId),
-                questions: state.questions.filter(q => q.examId !== action.payload.examId) // Cascade delete
+                exams: state.exams.filter(e => e.id !== examId),
+                questions: state.questions.filter(q => q.examId !== examId), // Cascade delete
+                tags: state.tags.filter(t => t.examId !== examId) // Cascade delete tags
             };
+        }
         
         case 'ADD_QUESTIONS':
             return { ...state, questions: [...state.questions, ...action.payload] };
@@ -99,6 +104,25 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
         case 'REPLACE_DATA':
             return action.payload;
+
+        case 'MERGE_DATA': {
+            const { exams: incomingExams, questions: incomingQuestions, tags: incomingTags } = action.payload;
+
+            const existingExamMap = new Map(state.exams.map(e => [e.id, e]));
+            incomingExams.forEach(exam => existingExamMap.set(exam.id, { ...(existingExamMap.get(exam.id) || {}), ...exam }));
+
+            const existingQuestionMap = new Map(state.questions.map(q => [q.id, q]));
+            incomingQuestions.forEach(question => existingQuestionMap.set(question.id, { ...(existingQuestionMap.get(question.id) || {}), ...question }));
+
+            const existingTagMap = new Map(state.tags.map(t => [t.id, t]));
+            (incomingTags || []).forEach(tag => existingTagMap.set(tag.id, { ...(existingTagMap.get(tag.id) || {}), ...tag }));
+
+            return {
+                exams: Array.from(existingExamMap.values()),
+                questions: Array.from(existingQuestionMap.values()),
+                tags: Array.from(existingTagMap.values()),
+            };
+        }
 
         case 'ADD_TAG':
             return { ...state, tags: [...state.tags, action.payload] };
@@ -265,14 +289,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         dispatch({ type: 'UPDATE_QUESTIONS', payload: { questionIds, data } });
     }, []);
 
-    const replaceData = useCallback(async (data: AppState) => {
-        // First, delete all existing data and images
-        const allImageKeys = state.questions.flatMap(q => [q.imageUrl, ...(q.answer?.imageUrls || [])]).filter(isImageKey);
-        if(allImageKeys.length > 0) await imageStore.deleteImages(allImageKeys);
-
-        // Now process and import new data
-        const processedQuestions = await Promise.all(
-            data.questions.map(async (q) => {
+    const processImportedQuestions = async (questions: Question[]) => {
+       return await Promise.all(
+            (questions || []).map(async (q) => {
                 const newQ = { ...q };
                 if (isBase64(newQ.imageUrl)) {
                     newQ.imageUrl = await imageStore.storeImage(newQ.imageUrl);
@@ -285,8 +304,22 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
                 return newQ;
             })
         );
+    }
+
+    const replaceData = useCallback(async (data: AppState) => {
+        // First, delete all existing data and images
+        const allImageKeys = state.questions.flatMap(q => [q.imageUrl, ...(q.answer?.imageUrls || [])]).filter(isImageKey);
+        if(allImageKeys.length > 0) await imageStore.deleteImages(allImageKeys);
+
+        // Now process and import new data
+        const processedQuestions = await processImportedQuestions(data.questions);
         dispatch({ type: 'REPLACE_DATA', payload: { exams: data.exams, questions: processedQuestions, tags: data.tags || [] } });
     }, [state.questions]);
+
+    const mergeData = useCallback(async (data: AppState) => {
+        const processedQuestions = await processImportedQuestions(data.questions);
+        dispatch({ type: 'MERGE_DATA', payload: { exams: data.exams, questions: processedQuestions, tags: data.tags || [] } });
+    }, []);
 
     const addTag = useCallback((tagData: Omit<Tag, 'id'>) => {
         const newTag: Tag = { id: crypto.randomUUID(), ...tagData };
@@ -319,6 +352,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         deleteQuestions,
         updateQuestions,
         replaceData,
+        mergeData,
         addTag,
         updateTag,
         deleteTag,
