@@ -12,6 +12,12 @@ export enum Status {
   Mastered = 'mastered',
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Answer {
   text?: string;
   imageUrls?: string[];
@@ -45,6 +51,7 @@ export interface Exam {
 export interface AppState {
     exams: Exam[];
     questions: Question[];
+    tags: Tag[];
 }
 
 export type View = 'home' | 'exam-detail' | 'study-mode';
