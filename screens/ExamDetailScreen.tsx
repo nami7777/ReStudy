@@ -69,6 +69,10 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
     };
 
     const handleFilterToggle = (filterKey: string) => {
+        if (filterKey === 'all') {
+            setActiveFilters([]);
+            return;
+        }
         setActiveFilters(prev => {
             const newFilters = new Set(prev);
             if (newFilters.has(filterKey)) {
@@ -81,14 +85,29 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
     };
 
     const filteredQuestions = useMemo(() => {
-        if (activeFilters.length === 0) return questions;
+        if (activeFilters.length === 0) {
+            return questions;
+        }
+
+        const difficultyAndStatusFilters = activeFilters.filter(f =>
+            Object.values(Difficulty).includes(f as Difficulty) || f === Status.New
+        );
+        const tagFilters = activeFilters.filter(f => tags.some(t => t.id === f));
+
         return questions.filter(q => {
-            const difficultyMatch = activeFilters.some(f => Object.values(Difficulty).includes(f as Difficulty) && q.difficulty === f);
-            const statusMatch = activeFilters.includes(Status.New) && q.status === Status.New;
-            const tagMatch = activeFilters.some(f => q.tags.includes(f));
-            return difficultyMatch || statusMatch || tagMatch;
+            // Match if no difficulty/status filters are selected, OR if the question's difficulty/status is in the list. (OR logic within this category)
+            const difficultyStatusMatch = difficultyAndStatusFilters.length === 0 ||
+                difficultyAndStatusFilters.includes(q.difficulty!) ||
+                difficultyAndStatusFilters.includes(q.status);
+
+            // Match if no tag filters are selected, OR if the question has ALL of the selected tags. (AND logic within this category)
+            const tagMatch = tagFilters.length === 0 ||
+                tagFilters.every(tagId => q.tags.includes(tagId));
+            
+            // A question must match the difficulty/status criteria AND the tag criteria. (AND logic between categories)
+            return difficultyStatusMatch && tagMatch;
         });
-    }, [questions, activeFilters]);
+    }, [questions, activeFilters, tags]);
 
 
     const showToast = (message: string) => {
@@ -285,12 +304,11 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
         ...tags.reduce((acc, tag) => ({ ...acc, [tag.id]: questions.filter(q => q.tags.includes(tag.id)).length }), {})
     };
 
-    const filterOptions = [
-      { id: 'all', label: 'All', count: counts.all },
-      { id: Status.New, label: 'New', count: counts[Status.New], colorClass: 'bg-gray-500', activeClass: 'bg-gray-500 text-white' },
-      { id: Difficulty.Normal, label: 'Normal', count: counts[Difficulty.Normal], colorClass: 'bg-normal', activeClass: 'bg-normal text-white' },
-      { id: Difficulty.Hard, label: 'Hard', count: counts[Difficulty.Hard], colorClass: 'bg-hard', activeClass: 'bg-hard text-white' },
-      { id: Difficulty.NightBefore, label: 'Night Before', count: counts[Difficulty.NightBefore], colorClass: 'bg-night-before', activeClass: 'bg-night-before text-white' },
+    const difficultyFilterOptions = [
+      { id: Status.New, label: 'New', count: counts[Status.New], activeClass: 'bg-gray-500 text-white' },
+      { id: Difficulty.Normal, label: 'Normal', count: counts[Difficulty.Normal], activeClass: 'bg-normal text-white' },
+      { id: Difficulty.Hard, label: 'Hard', count: counts[Difficulty.Hard], activeClass: 'bg-hard text-white' },
+      { id: Difficulty.NightBefore, label: 'Night Before', count: counts[Difficulty.NightBefore], activeClass: 'bg-night-before text-white' },
     ];
 
 
@@ -325,13 +343,16 @@ const ExamDetailScreen = ({ examId, setView, setStudyQuestions, setStudyStartInd
 
             <div className="sticky top-0 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm py-4 z-10 flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div className="flex items-center space-x-2 flex-wrap gap-y-2">
-                    {filterOptions.map(opt => (
+                    <button onClick={() => handleFilterToggle('all')} className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${activeFilters.length === 0 ? 'bg-indigo-500 text-white' : 'bg-white dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+                        All <span className="text-xs opacity-70">{counts.all}</span>
+                    </button>
+                    {difficultyFilterOptions.map(opt => (
                          <button key={opt.id} onClick={() => handleFilterToggle(opt.id)} className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${activeFilters.includes(opt.id) ? opt.activeClass : 'bg-white dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
                             {opt.label} <span className="text-xs opacity-70">{opt.count}</span>
                         </button>
                     ))}
                      {tags.map(tag => (
-                        <button key={tag.id} onClick={() => handleFilterToggle(tag.id)} className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 text-white shadow-md ${activeFilters.includes(tag.id) ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`} style={{ backgroundColor: tag.color }}>
+                        <button key={tag.id} onClick={() => handleFilterToggle(tag.id)} className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 text-white shadow-md ${activeFilters.includes(tag.id) ? 'opacity-100 ring-2 ring-white ring-offset-2 dark:ring-offset-gray-900' : 'opacity-70 hover:opacity-100'}`} style={{ backgroundColor: tag.color }}>
                            {tag.name} <span className="text-xs opacity-70">{counts[tag.id] || 0}</span>
                         </button>
                     ))}
