@@ -1,12 +1,10 @@
-
 import React, { useState, useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Exam, Difficulty, View, AppState } from '../types';
 import { formatDate } from '../utils/helpers';
 import Modal from '../components/Modal';
 import ExamForm from '../components/ExamForm';
-import { PlusIcon, TrashIcon, PencilIcon, DownloadIcon, UploadIcon } from '../components/icons';
-import { getImage } from '../services/imageStore';
+import { PlusIcon, TrashIcon, PencilIcon, UploadIcon } from '../components/icons';
 
 interface ImportDataModalProps {
     onClose: () => void;
@@ -27,7 +25,7 @@ const ImportDataModal = ({ onClose, onMerge, onOverwrite, importedData }: Import
                         className="w-full text-left p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
                     >
                         <h3 className="font-semibold text-gray-800 dark:text-gray-200">Merge with existing data</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Adds new items and updates existing ones. Does not delete anything.</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Adds new items and updates existing ones based on their ID. Does not delete anything.</p>
                     </button>
                     <button
                         onClick={() => onOverwrite(importedData)}
@@ -45,16 +43,13 @@ const ImportDataModal = ({ onClose, onMerge, onOverwrite, importedData }: Import
     );
 };
 
-
 interface HomeScreenProps {
     setView: (view: View) => void;
     setCurrentExamId: (id: string) => void;
 }
 
-const isImageKey = (url?: string): url is string => !!url && url.startsWith('idb://');
-
 const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
-    const { exams, questions: allQuestions, tags, addExam, updateExam, deleteExam, replaceData, mergeData } = useData();
+    const { exams, questions: allQuestions, addExam, updateExam, deleteExam, replaceData, mergeData } = useData();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
     const [importedData, setImportedData] = useState<AppState | null>(null);
@@ -88,44 +83,6 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
         setCurrentExamId(examId);
         setView('exam-detail');
     };
-    
-    const handleExport = async () => {
-        // Deep copy data to avoid modifying state
-        const questionsWithImages = await Promise.all(
-            JSON.parse(JSON.stringify(allQuestions)).map(async (q: any) => {
-                if(isImageKey(q.imageUrl)) {
-                    q.imageUrl = await getImage(q.imageUrl);
-                }
-                if(q.answer?.imageUrls) {
-                    q.answer.imageUrls = await Promise.all(
-                        q.answer.imageUrls.map((url: string) => isImageKey(url) ? getImage(url) : url)
-                    );
-                }
-                return q;
-            })
-        );
-        
-        const dataToExport = {
-            version: '1.3.0', // Updated version for scoped tags
-            createdAt: new Date().toISOString(),
-            data: {
-                exams,
-                questions: questionsWithImages,
-                tags,
-            }
-        };
-        const jsonString = JSON.stringify(dataToExport, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const date = new Date().toISOString().slice(0, 10);
-        link.download = `restudy-backup-${date}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
 
     const handleImportClick = () => {
         importInputRef.current?.click();
@@ -141,8 +98,13 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
                 const text = e.target?.result;
                 if (typeof text !== 'string') throw new Error('File could not be read.');
                 const parsedJson = JSON.parse(text);
-                const appState: AppState = parsedJson.data;
-
+                
+                // Support both new scoped export and old global export format
+                const appState: AppState = parsedJson.data || {
+                    exams: [parsedJson.exam],
+                    questions: parsedJson.questions,
+                    tags: parsedJson.tags
+                };
 
                 // Validation
                 if (!appState || !Array.isArray(appState.exams) || !Array.isArray(appState.questions)) {
@@ -175,7 +137,7 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
     };
 
     const handleOverwrite = async (data: AppState) => {
-        if(window.confirm('Are you sure you want to overwrite all existing data? This cannot be undone.')) {
+        if (window.confirm("Are you sure you want to overwrite all existing data? This cannot be undone.")) {
             await replaceData(data);
             setImportedData(null);
             alert('Data overwritten successfully!');
@@ -252,14 +214,12 @@ const HomeScreen = ({ setView, setCurrentExamId }: HomeScreenProps) => {
                     <div>
                         <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Manage Data</h3>
                         <div className="flex items-center gap-4">
-                            <button onClick={handleExport} className="flex items-center gap-2 bg-white dark:bg-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600">
-                                <DownloadIcon className="w-5 h-5" /> Export Data
-                            </button>
                             <input type="file" ref={importInputRef} onChange={handleFileImport} accept=".json" className="hidden" />
                             <button onClick={handleImportClick} className="flex items-center gap-2 bg-white dark:bg-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600">
                                 <UploadIcon className="w-5 h-5" /> Import Data
                             </button>
                         </div>
+                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Import a previously exported JSON backup file.</p>
                     </div>
                 </div>
             )}

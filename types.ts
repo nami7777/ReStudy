@@ -31,7 +31,7 @@ export interface Question {
   imageUrl?: string;
   text?: string;
   tags: string[];
-  difficulty: Difficulty;
+  difficulty?: Difficulty;
   status: Status;
   notes?: string;
   answer?: Answer;

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Tag } from '../types';
@@ -37,8 +36,6 @@ export const TagManager = ({ examId }: { examId: string }) => {
         setColor('#6366f1');
     };
 
-    const canAddTag = tags.length < 3;
-
     return (
         <div className="space-y-4">
             <form onSubmit={handleSubmit} className="flex items-end gap-3 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
@@ -67,7 +64,6 @@ export const TagManager = ({ examId }: { examId: string }) => {
                 </div>
                 <button
                     type="submit"
-                    disabled={!canAddTag && !editingTag}
                     className="flex items-center gap-2 bg-indigo-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                     {editingTag ? 'Save' : <PlusIcon className="w-5 h-5"/>}
@@ -76,7 +72,6 @@ export const TagManager = ({ examId }: { examId: string }) => {
                     <button type="button" onClick={handleCancelEdit} className="p-2.5 bg-gray-200 dark:bg-gray-600 rounded-lg"><XIcon className="w-5 h-5"/></button>
                 )}
             </form>
-            {!canAddTag && !editingTag && <p className="text-sm text-yellow-600 dark:text-yellow-400 text-center">You can create up to 3 custom tags per exam.</p>}
 
             <div className="flex flex-wrap gap-2">
                 {tags.map(tag => (

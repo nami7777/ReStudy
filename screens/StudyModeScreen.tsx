@@ -1,9 +1,11 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Question, Difficulty, View } from '../types';
+import { Question, Difficulty, View, Status } from '../types';
 import { XIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/icons';
 import AnswerDisplayModal from '../components/AnswerDisplayModal';
 import { useStoredImage } from '../hooks/useStoredImage';
 import Spinner from '../components/Spinner';
+import ImageZoomModal from '../components/ImageZoomModal';
 
 interface StudyModeScreenProps {
     initialQuestions: Question[];
@@ -19,16 +21,24 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
     const [animationClass, setAnimationClass] = useState('animate-fadeIn');
     const [isFinished, setIsFinished] = useState(false);
     const [isAnswerVisible, setIsAnswerVisible] = useState(false);
+    const [zoomedImageKey, setZoomedImageKey] = useState<string | null>(null);
     const swipeRef = useRef({ startX: 0, isSwiping: false });
 
-    const progressKey = `restudy-progress-${examId}`;
+    const progressKey = `restudy-progress-${examId}`; // Note: This key is simplified and doesn't account for filters.
     const currentQuestion = questions[currentIndex];
     const hasAnswer = !!currentQuestion?.answer && (!!currentQuestion.answer.text || (currentQuestion.answer.imageUrls && currentQuestion.answer.imageUrls.length > 0));
 
     useEffect(() => {
         // Persist progress
         localStorage.setItem(progressKey, currentIndex.toString());
-    }, [currentIndex, progressKey]);
+
+        // Update status to 'seen' if it's 'new'
+        if (currentQuestion?.status === Status.New) {
+            updateQuestion(currentQuestion.id, { status: Status.Seen });
+            // Optimistically update local state to avoid re-triggering
+            setQuestions(qs => qs.map(q => q.id === currentQuestion.id ? {...q, status: Status.Seen} : q));
+        }
+    }, [currentIndex, progressKey, currentQuestion, updateQuestion]);
 
     const navigate = useCallback((direction: 'next' | 'prev') => {
         if (isAnswerVisible) setIsAnswerVisible(false);
@@ -54,16 +64,16 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
     
     const handleTriage = (difficulty: Difficulty) => {
         if (!currentQuestion) return;
-        updateQuestion(currentQuestion.id, { difficulty });
+        updateQuestion(currentQuestion.id, { difficulty, status: Status.Seen });
         // Optimistically update local state for smoother UI
-        const updatedQuestions = questions.map(q => q.id === currentQuestion.id ? {...q, difficulty} : q);
+        const updatedQuestions = questions.map(q => q.id === currentQuestion.id ? {...q, difficulty, status: Status.Seen} : q);
         setQuestions(updatedQuestions);
         setTimeout(() => navigate('next'), 200);
     };
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (isFinished) return;
+            if (isFinished || zoomedImageKey || isAnswerVisible) return;
             if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'l') navigate('next');
             if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'h') navigate('prev');
             if (e.key === '1') handleTriage(Difficulty.Normal);
@@ -76,13 +86,12 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
                 }
             }
             if (e.key === 'Escape') {
-                if(isAnswerVisible) setIsAnswerVisible(false);
-                else setView('exam-detail');
+                 setView('exam-detail');
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [navigate, setView, handleTriage, isFinished, hasAnswer, isAnswerVisible]);
+    }, [navigate, setView, handleTriage, isFinished, hasAnswer, isAnswerVisible, zoomedImageKey]);
 
     const handleTouchStart = (e: React.TouchEvent) => {
         swipeRef.current.startX = e.touches[0].clientX;
@@ -121,7 +130,7 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
         setAnimationClass('animate-fadeIn');
     };
 
-    const QuestionImage = ({ imageUrl }: { imageUrl: string }) => {
+    const QuestionImage = ({ imageUrl, onImageClick }: { imageUrl: string, onImageClick: (url: string) => void }) => {
         const { src, isLoading } = useStoredImage(imageUrl);
         if (isLoading) {
             return (
@@ -130,7 +139,11 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
                 </div>
             );
         }
-        return <img src={src} alt="Question" className="max-w-full max-h-full object-contain rounded-lg"/>
+        return (
+            <button onClick={() => onImageClick(imageUrl)} className="w-full max-w-4xl max-h-[70vh] flex justify-center items-center cursor-zoom-in">
+                <img src={src} alt="Question" className="max-w-full max-h-full object-contain rounded-lg"/>
+            </button>
+        )
     }
 
 
@@ -165,6 +178,7 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
 
     return (
         <div className="fixed inset-0 bg-gray-900 flex flex-col justify-center items-center text-white z-50 p-4 overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+            {zoomedImageKey && <ImageZoomModal imageKey={zoomedImageKey} onClose={() => setZoomedImageKey(null)} />}
             {isAnswerVisible && currentQuestion.answer && (
                 <AnswerDisplayModal answer={currentQuestion.answer} onClose={() => setIsAnswerVisible(false)} />
             )}
@@ -175,7 +189,7 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
 
             <div className={`w-full max-w-4xl max-h-[70vh] flex justify-center items-center my-4 ${animationClass}`}>
                 {currentQuestion.imageUrl ? (
-                    <QuestionImage imageUrl={currentQuestion.imageUrl} />
+                    <QuestionImage imageUrl={currentQuestion.imageUrl} onImageClick={setZoomedImageKey} />
                 ) : (
                     <p className="text-2xl p-8 bg-gray-800 rounded-lg">{currentQuestion.text}</p>
                 )}

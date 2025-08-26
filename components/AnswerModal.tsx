@@ -5,6 +5,7 @@ import Modal from './Modal';
 import { XIcon } from './icons';
 import { storeImage } from '../services/imageStore';
 import { useStoredImage } from '../hooks/useStoredImage';
+import ImageZoomModal from './ImageZoomModal';
 
 interface AnswerModalProps {
     question: Question;
@@ -21,7 +22,7 @@ const ImagePreview = ({ imageKey }: { imageKey: string }) => {
     );
 }
 
-const QuestionContextImage = ({ imageUrl }: { imageUrl: string }) => {
+const QuestionContextImage = ({ imageUrl, onImageClick }: { imageUrl: string; onImageClick: (url: string) => void }) => {
     const { src, isLoading } = useStoredImage(imageUrl);
 
     if (isLoading) {
@@ -34,13 +35,18 @@ const QuestionContextImage = ({ imageUrl }: { imageUrl: string }) => {
     
     if (!src) return null;
 
-    return <img src={src} alt="Question context" className="max-h-32 w-full object-contain rounded-md bg-gray-100 dark:bg-gray-700 mb-4"/>;
+    return (
+        <button onClick={() => onImageClick(imageUrl)} className="w-full cursor-zoom-in">
+            <img src={src} alt="Question context" className="max-h-32 w-full object-contain rounded-md bg-gray-100 dark:bg-gray-700 mb-4"/>
+        </button>
+    );
 }
 
 
 const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
     const [answerText, setAnswerText] = useState(question.answer?.text || '');
     const [answerImageKeys, setAnswerImageKeys] = useState<string[]>(question.answer?.imageUrls || []);
+    const [zoomedImageKey, setZoomedImageKey] = useState<string | null>(null);
 
     const handleSave = () => {
         if (answerText.trim() || answerImageKeys.length > 0) {
@@ -99,9 +105,11 @@ const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
     };
 
     return (
+        <>
+        {zoomedImageKey && <ImageZoomModal imageKey={zoomedImageKey} onClose={() => setZoomedImageKey(null)} />}
         <Modal isOpen={true} onClose={onClose} title="Add Answer">
             <div className="space-y-4">
-                {question.imageUrl && <QuestionContextImage imageUrl={question.imageUrl} />}
+                {question.imageUrl && <QuestionContextImage imageUrl={question.imageUrl} onImageClick={setZoomedImageKey} />}
                 
                 <div>
                     <label htmlFor="answerText" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Answer Text (Optional)</label>
@@ -110,7 +118,7 @@ const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
                         rows={4} 
                         value={answerText} 
                         onChange={(e) => setAnswerText(e.target.value)} 
-                        className="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 py-2 px-3 placeholder-gray-500 dark:placeholder-gray-400"
+                        className="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 py-2 px-3 placeholder-gray-500 dark:placeholder-400"
                         placeholder="Type the answer here..."
                     ></textarea>
                 </div>
@@ -144,6 +152,7 @@ const AnswerModal = ({ question, onClose, onSave }: AnswerModalProps) => {
                 </div>
             </div>
         </Modal>
+        </>
     );
 };
 
