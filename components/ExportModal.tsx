@@ -11,15 +11,16 @@ interface ExportModalProps {
     onClose: () => void;
 }
 
-const ALL_FILTERS = [Difficulty.Normal, Difficulty.Hard, Difficulty.NightBefore, Status.New];
+const ALL_DIFFICULTY_STATUS_FILTERS = [Difficulty.Normal, Difficulty.Hard, Difficulty.NightBefore, Status.New];
 
 const ExportModal = ({ exam, questions, tags, onClose }: ExportModalProps) => {
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
     const [isExporting, setIsExporting] = useState(false);
     const [exportMessage, setExportMessage] = useState('');
+    const [tagFilterLogic, setTagFilterLogic] = useState<'union' | 'intersection'>('union');
 
     const allFilterOptions = useMemo(() => {
-        const options = [...ALL_FILTERS, ...tags.map(t => t.id)];
+        const options = [...ALL_DIFFICULTY_STATUS_FILTERS, ...tags.map(t => t.id)];
         return options;
     }, [tags]);
 
@@ -45,13 +46,24 @@ const ExportModal = ({ exam, questions, tags, onClose }: ExportModalProps) => {
     };
 
     const questionsToExport = useMemo(() => {
-        if (selectedFilters.length === 0) return [];
+        const selectedTagFilters = selectedFilters.filter(f => tags.some(t => t.id === f));
+        const selectedDifficultyStatusFilters = selectedFilters.filter(f => ALL_DIFFICULTY_STATUS_FILTERS.includes(f as any));
+        
+        // If the user has deselected all filters in either category, treat that category as "passing" all questions.
+        // This makes the filtering behave like an AND condition across categories.
         return questions.filter(q => {
-            if (selectedFilters.includes(q.difficulty)) return true;
-            if (selectedFilters.includes(q.status)) return true;
-            return q.tags.some(tagId => selectedFilters.includes(tagId));
+            const difficultyStatusCriteriaMet = selectedDifficultyStatusFilters.length === 0 ||
+                selectedDifficultyStatusFilters.some(f => f === q.difficulty || f === q.status);
+            
+            const tagCriteriaMet = selectedTagFilters.length === 0 ||
+                (tagFilterLogic === 'intersection'
+                    ? selectedTagFilters.every(tagId => q.tags.includes(tagId))
+                    : selectedTagFilters.some(tagId => q.tags.includes(tagId))
+                );
+            
+            return difficultyStatusCriteriaMet && tagCriteriaMet;
         });
-    }, [questions, selectedFilters]);
+    }, [questions, selectedFilters, tags, tagFilterLogic]);
 
     const getFilterLabel = (filterId: string) => {
         switch (filterId) {
@@ -65,7 +77,7 @@ const ExportModal = ({ exam, questions, tags, onClose }: ExportModalProps) => {
 
     const handleExport = async (format: 'json' | 'pdf') => {
         if (questionsToExport.length === 0) {
-            alert("No questions selected for export.");
+            alert("No questions match the selected filters for export.");
             return;
         }
         setIsExporting(true);
@@ -97,10 +109,10 @@ const ExportModal = ({ exam, questions, tags, onClose }: ExportModalProps) => {
             ) : (
                 <div className="space-y-6">
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Select questions to export</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Choose which question categories you want to include in the export file.</p>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">1. Select questions to export</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Choose which question categories you want to include. A question must match a selected difficulty/status AND the selected tag criteria.</p>
                         
-                        <div className="space-y-2 max-h-60 overflow-y-auto p-3 bg-gray-100 dark:bg-gray-900 rounded-lg">
+                        <div className="space-y-2 max-h-48 overflow-y-auto p-3 bg-gray-100 dark:bg-gray-900 rounded-lg">
                              <label className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer font-bold">
                                 <input
                                     type="checkbox"
@@ -123,6 +135,30 @@ const ExportModal = ({ exam, questions, tags, onClose }: ExportModalProps) => {
                                 </label>
                             ))}
                         </div>
+                    </div>
+
+                    <div>
+                         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">2. Set tag matching logic</h3>
+                         <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
+                            <button 
+                                onClick={() => setTagFilterLogic('union')} 
+                                className={`flex-1 px-3 py-1 text-sm font-semibold rounded-md transition-colors ${tagFilterLogic === 'union' ? 'bg-indigo-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                            >
+                                Match Any Tag
+                            </button>
+                            <button 
+                                onClick={() => setTagFilterLogic('intersection')} 
+                                className={`flex-1 px-3 py-1 text-sm font-semibold rounded-md transition-colors ${tagFilterLogic === 'intersection' ? 'bg-indigo-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                            >
+                                Match All Tags
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 px-1">
+                            {tagFilterLogic === 'union' 
+                                ? "Includes questions with at least one of the selected tags."
+                                : "Includes only questions that have ALL of the selected tags."
+                            }
+                        </p>
                     </div>
 
                     <div className="pt-4 border-t border-gray-200 dark:border-gray-700">

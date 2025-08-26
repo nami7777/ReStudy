@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Question, Difficulty, View, Status } from '../types';
 import { XIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/icons';
@@ -134,16 +135,16 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
         const { src, isLoading } = useStoredImage(imageUrl);
         if (isLoading) {
             return (
-                <div className="w-full max-w-4xl max-h-[70vh] flex justify-center items-center">
+                <div className="w-full h-full flex justify-center items-center">
                     <Spinner />
                 </div>
             );
         }
         return (
-            <button onClick={() => onImageClick(imageUrl)} className="w-full max-w-4xl max-h-[70vh] flex justify-center items-center cursor-zoom-in">
+            <button onClick={() => onImageClick(imageUrl)} className="w-full h-full flex justify-center items-center cursor-zoom-in">
                 <img src={src} alt="Question" className="max-w-full max-h-full object-contain rounded-lg"/>
             </button>
-        )
+        );
     }
 
 
@@ -177,7 +178,7 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
     }
 
     return (
-        <div className="fixed inset-0 bg-gray-900 flex flex-col justify-center items-center text-white z-50 p-4 overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <div className="fixed inset-0 bg-gray-900 flex flex-col text-white z-50 p-4 overflow-hidden" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
             {zoomedImageKey && <ImageZoomModal imageKey={zoomedImageKey} onClose={() => setZoomedImageKey(null)} />}
             {isAnswerVisible && currentQuestion.answer && (
                 <AnswerDisplayModal answer={currentQuestion.answer} onClose={() => setIsAnswerVisible(false)} />
@@ -187,15 +188,17 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
                 <XIcon />
             </button>
 
-            <div className={`w-full max-w-4xl max-h-[70vh] flex justify-center items-center my-4 ${animationClass}`}>
-                {currentQuestion.imageUrl ? (
-                    <QuestionImage imageUrl={currentQuestion.imageUrl} onImageClick={setZoomedImageKey} />
-                ) : (
-                    <p className="text-2xl p-8 bg-gray-800 rounded-lg">{currentQuestion.text}</p>
-                )}
-            </div>
+            <main className="flex-1 flex justify-center items-center min-h-0 w-full max-w-6xl mx-auto">
+                <div className={`w-full h-full flex justify-center items-center ${animationClass}`}>
+                    {currentQuestion.imageUrl ? (
+                        <QuestionImage imageUrl={currentQuestion.imageUrl} onImageClick={setZoomedImageKey} />
+                    ) : (
+                        <p className="text-2xl p-8 bg-gray-800 rounded-lg">{currentQuestion.text}</p>
+                    )}
+                </div>
+            </main>
             
-            <div className="absolute bottom-6 flex justify-center items-center gap-2 md:gap-8">
+            <footer className="flex-shrink-0 flex justify-center items-center gap-2 md:gap-8 pt-4">
                 <button onClick={() => handleTriage(Difficulty.Normal)} className="flex flex-col items-center gap-2 text-normal hover:text-green-300 transition-colors p-2 rounded-lg hover:bg-white/10">
                     <span className="text-2xl">✅</span><span className="text-xs font-semibold">Got It (1)</span>
                 </button>
@@ -210,7 +213,7 @@ const StudyModeScreen = ({ initialQuestions, setView, updateQuestion, examId, st
                         <span className="text-2xl">💡</span><span className="text-xs font-semibold">Answer (Space)</span>
                     </button>
                  )}
-            </div>
+            </footer>
             
              <button onClick={() => navigate('prev')} className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 rounded-full hover:bg-white/20 hidden md:block" aria-label="Previous Question"><ChevronLeftIcon /></button>
              <button onClick={() => navigate('next')} className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 rounded-full hover:bg-white/20 hidden md:block" aria-label="Next Question"><ChevronRightIcon /></button>
